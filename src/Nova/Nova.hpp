@@ -339,6 +339,10 @@ namespace Nova
 
         std::unordered_map<Key, bool> keyStates;
 
+        bool cursorLocked = false;
+        Cursor invisibleCursor;
+
+
     public:
         PlatformData *platformData;
         Backend backend;
@@ -352,5 +356,8 @@ namespace Nova
         bool HasEvents();
 
         Event *PopEvent();
+
+        void LockCursor();
+        void UnlockCursor();
     };
 }

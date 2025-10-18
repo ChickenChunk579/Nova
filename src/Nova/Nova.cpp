@@ -126,17 +126,38 @@ namespace Nova
 
             case MotionNotify:
             {
-                int mouseX = event.xmotion.x;
-                int mouseY = event.xmotion.y;
+                if (cursorLocked)
+                {
+                    int centerX = width / 2;
+                    int centerY = height / 2;
 
-                MouseMoveEvent *mouseMoveEvent = new MouseMoveEvent();
-                mouseMoveEvent->x = mouseX;
-                mouseMoveEvent->y = mouseY;
+                    int dx = event.xmotion.x - centerX;
+                    int dy = event.xmotion.y - centerY;
 
-                eventStack.push(mouseMoveEvent);
+                    if (dx != 0 || dy != 0)
+                    {
+                        // Push delta movement event
+                        MouseMoveEvent* mouseMoveEvent = new MouseMoveEvent();
+                        mouseMoveEvent->x = dx;
+                        mouseMoveEvent->y = dy;
+                        eventStack.push(mouseMoveEvent);
+
+                        // Warp back to center
+                        XWarpPointer(display, None, window, 0, 0, 0, 0, centerX, centerY);
+                        XFlush(display);
+                    }
+                }
+                else
+                {
+                    MouseMoveEvent *mouseMoveEvent = new MouseMoveEvent();
+                    mouseMoveEvent->x = event.xmotion.x;
+                    mouseMoveEvent->y = event.xmotion.y;
+                    eventStack.push(mouseMoveEvent);
+                }
 
                 break;
             }
+
 
             case ButtonPress:
             {
@@ -215,4 +236,42 @@ namespace Nova
 
         return value;
     }
+
+    void Nova::Window::LockCursor() {
+        if (cursorLocked) return;
+
+        // Create invisible cursor
+        Pixmap bm_no;
+        XColor black;
+        static char no_data[] = { 0,0,0,0,0,0,0,0 };
+        black.red = black.green = black.blue = 0;
+        bm_no = XCreateBitmapFromData(display, window, no_data, 8, 8);
+        invisibleCursor = XCreatePixmapCursor(display, bm_no, bm_no, &black, &black, 0, 0);
+        XDefineCursor(display, window, invisibleCursor);
+        XFreePixmap(display, bm_no);
+
+        // Grab pointer
+        XGrabPointer(display, window, True,
+                    PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
+                    GrabModeAsync, GrabModeAsync, window, None, CurrentTime);
+
+        // Move to center
+        int centerX = width / 2;
+        int centerY = height / 2;
+        XWarpPointer(display, None, window, 0, 0, 0, 0, centerX, centerY);
+        XFlush(display);
+
+        cursorLocked = true;
+    }
+
+    void Nova::Window::UnlockCursor() {
+        if (!cursorLocked) return;
+
+        XUngrabPointer(display, CurrentTime);
+        XUndefineCursor(display, window);
+        XFreeCursor(display, invisibleCursor);
+
+        cursorLocked = false;
+    }
+
 }
